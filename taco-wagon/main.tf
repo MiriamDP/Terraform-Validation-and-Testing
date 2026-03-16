@@ -20,6 +20,12 @@ data "aws_availability_zones" "available" {
   state = "available"
 
   # Module 2 Add postcondition to ensure enough AZs are available
+  lifecycle {
+    postcondition {
+      condition = length(self.zone_ids)>=var.availability_zones
+      error_message = "No ha suficientes zonas disponibles"
+    }
+  }
 }
 
 # VPC for the application
@@ -165,6 +171,23 @@ resource "aws_instance" "web" {
   # Module 2: Add precondition to ensure instance_type is x86_64
   # Module 2: Add precondition to ensure AMI architecture is x86_64
   # Module 2: Add postcondition to ensure instance has a public IP
+  lifecycle {
+    precondition {
+      condition = data.aws_ami.amazon_linux.architecture=="x86_64"
+      error_message = "The select AMI is not compatible with x86_64 architectures"
+
+    }
+    precondition {
+      condition     = can(regex("^[a-z][0-9]+g[dn]?\\.", var.instance_type)) == false
+      error_message = "The selected instance type is not compatible with x86_64 architecture."
+    }
+
+    # Make sure the instance has a public IP address
+    postcondition {
+      condition     = self.public_ip != "" && self.public_ip != null
+      error_message = "The EC2 instance must have a public IP address."
+    }
+  }
 }
 
 # S3 bucket for static assets
